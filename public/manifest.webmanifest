@@ -1,0 +1,43 @@
+{
+  "name": "IdeaNoter — Startup & Business Ideas",
+  "short_name": "IdeaNoter",
+  "description": "Frictionless cross-platform idea capturing and startup canvas for Mac, Windows, iPhone and Android.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#090d16",
+  "theme_color": "#6366f1",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["productivity", "business", "utilities"],
+  "shortcuts": [
+    {
+      "name": "Quick Spark",
+      "url": "/?action=capture",
+      "description": "Capture an idea immediately"
+    },
+    {
+      "name": "Kanban Board",
+      "url": "/?view=kanban",
+      "description": "View idea pipeline"
+    }
+  ]
+}
