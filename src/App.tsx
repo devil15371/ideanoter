@@ -1,24 +1,17 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import {
-  Header,
-} from './components/Header';
-import { IdeaCard } from './components/IdeaCard';
-import { KanbanBoard } from './components/KanbanBoard';
-import { PriorityMatrix } from './components/PriorityMatrix';
-import { QuickCaptureModal } from './components/QuickCaptureModal';
+import React, { useState, useEffect } from 'react';
+import { FloatingNotepad } from './components/FloatingNotepad';
+import { FloatingMascotWidget } from './components/FloatingMascotWidget';
 import { MobileInstallGuideModal } from './components/MobileInstallGuideModal';
 import { SettingsModal } from './components/SettingsModal';
-import { MobileTabBar } from './components/MobileTabBar';
+import { MascotCharacter } from './components/MascotCharacter';
 
-import type { Idea, IdeaStage } from './types/idea';
-import { calculateScore } from './types/idea';
+import type { Idea } from './types/idea';
 import { INITIAL_IDEAS } from './data/seedIdeas';
 import {
   loadLocalIdeas,
   saveLocalIdeas,
   syncAllWithCloud,
   exportIdeasToMarkdown,
-  exportIdeasToJSON,
   playAudioFeedback,
 } from './services/storage';
 import {
@@ -26,19 +19,26 @@ import {
   syncIdeaToCloud,
   deleteIdeaFromCloud,
 } from './services/supabase';
-import { Plus, ArrowUpDown, Star } from 'lucide-react';
+import {
+  Smartphone,
+  Settings,
+  Plus,
+  Cloud,
+  Download,
+} from 'lucide-react';
 
 export const App: React.FC = () => {
   const [ideas, setIdeas] = useState<Idea[]>(() => loadLocalIdeas());
-  const [viewMode, setViewMode] = useState<'grid' | 'kanban' | 'matrix'>('grid');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('ALL');
-  const [sortBy, setSortBy] = useState<'updated' | 'score' | 'excitement' | 'alphabetical'>('score');
-  const [filterFavoritesOnly, setFilterFavoritesOnly] = useState(false);
+  const [currentIdeaIndex, setCurrentIdeaIndex] = useState<number>(0);
+  const [isMinimized, setIsMinimized] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('ideanoter_minimized_v1') === 'true';
+    } catch {
+      return false;
+    }
+  });
 
   // Modals state
-  const [isQuickCaptureOpen, setIsQuickCaptureOpen] = useState(false);
-  const [editingIdea, setEditingIdea] = useState<Idea | null>(null);
   const [isInstallGuideOpen, setIsInstallGuideOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isCloudConnected, setIsCloudConnected] = useState(false);
@@ -57,62 +57,71 @@ export const App: React.FC = () => {
     }
   }, []);
 
-  // Keyboard shortcut listener (⌘N for capture, ⌘K for search, Esc to close modals)
+  // Keyboard shortcut listener (⌘N for new sheet, Esc to toggle minimize)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // ⌘N or Ctrl+N -> Quick Capture
+      // ⌘N or Ctrl+N -> New Page
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'n') {
         e.preventDefault();
-        setEditingIdea(null);
-        setIsQuickCaptureOpen(true);
+        handleCreateNewIdea();
       }
-      // Esc -> close any open modals
+      // Esc -> Toggle minimize or close modal
       if (e.key === 'Escape') {
-        setIsQuickCaptureOpen(false);
-        setIsInstallGuideOpen(false);
-        setIsSettingsOpen(false);
-        setEditingIdea(null);
+        if (isInstallGuideOpen || isSettingsOpen) {
+          setIsInstallGuideOpen(false);
+          setIsSettingsOpen(false);
+        } else {
+          toggleMinimize();
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [isInstallGuideOpen, isSettingsOpen, isMinimized, ideas]);
 
-  // Save idea handler (create or update)
-  const handleSaveIdea = (ideaData: Omit<Idea, 'id' | 'createdAt' | 'updatedAt'>) => {
-    const now = new Date().toISOString();
-
-    if (editingIdea) {
-      // Update existing
-      const updated: Idea = {
-        ...editingIdea,
-        ...ideaData,
-        updatedAt: now,
-      };
-
-      const updatedList = ideas.map((i) => (i.id === updated.id ? updated : i));
-      setIdeas(updatedList);
-      saveLocalIdeas(updatedList);
-      syncIdeaToCloud(updated);
-      setEditingIdea(null);
-    } else {
-      // Create new
-      const newIdea: Idea = {
-        id: 'idea-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
-        ...ideaData,
-        createdAt: now,
-        updatedAt: now,
-      };
-
-      const updatedList = [newIdea, ...ideas];
-      setIdeas(updatedList);
-      saveLocalIdeas(updatedList);
-      syncIdeaToCloud(newIdea);
-    }
+  const toggleMinimize = (minimizedState?: boolean) => {
+    setIsMinimized((prev) => {
+      const next = typeof minimizedState === 'boolean' ? minimizedState : !prev;
+      try {
+        localStorage.setItem('ideanoter_minimized_v1', String(next));
+      } catch {}
+      return next;
+    });
   };
 
-  // Update idea directly (from Card / Kanban toggle)
+  // Create new idea note
+  const handleCreateNewIdea = (title = 'New Spark') => {
+    playAudioFeedback('spark');
+    const now = new Date().toISOString();
+    const newIdea: Idea = {
+      id: 'idea-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+      title: title,
+      oneLiner: '',
+      category: 'AI',
+      stage: 'spark',
+      excitement: 4,
+      marketSize: 4,
+      feasibility: 4,
+      tags: ['Quick Note'],
+      checklist: [],
+      pinned: false,
+      isFavorite: false,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    const updatedList = [newIdea, ...ideas];
+    setIdeas(updatedList);
+    setCurrentIdeaIndex(0);
+    saveLocalIdeas(updatedList);
+    syncIdeaToCloud(newIdea);
+
+    // Make sure notepad is open
+    toggleMinimize(false);
+  };
+
+  // Update existing idea note
   const handleUpdateIdea = (updated: Idea) => {
     const updatedList = ideas.map((i) => (i.id === updated.id ? updated : i));
     setIdeas(updatedList);
@@ -120,40 +129,18 @@ export const App: React.FC = () => {
     syncIdeaToCloud(updated);
   };
 
-  // Delete idea
-  const handleDeleteIdea = (id: string) => {
-    playAudioFeedback('click');
+  // Delete current idea
+  const handleDeleteCurrentIdea = (id: string) => {
     const updatedList = ideas.filter((i) => i.id !== id);
     setIdeas(updatedList);
+    setCurrentIdeaIndex((prev) => Math.max(0, Math.min(prev, updatedList.length - 1)));
     saveLocalIdeas(updatedList);
     deleteIdeaFromCloud(id);
-  };
-
-  // Edit idea modal trigger
-  const handleEditIdea = (idea: Idea) => {
-    setEditingIdea(idea);
-    setIsQuickCaptureOpen(true);
-  };
-
-  // Quick Capture from column
-  const handleOpenQuickCaptureWithStage = (_stage?: IdeaStage) => {
-    setEditingIdea(null);
-    setIsQuickCaptureOpen(true);
-  };
-
-  // Reset to seed data
-  const handleResetSeedData = () => {
-    setIdeas(INITIAL_IDEAS);
-    saveLocalIdeas(INITIAL_IDEAS);
-    for (const idea of INITIAL_IDEAS) {
-      syncIdeaToCloud(idea);
-    }
   };
 
   // Import JSON ideas
   const handleImportIdeas = (imported: Idea[]) => {
     const updatedList = [...imported, ...ideas];
-    // Deduplicate by id
     const uniqueMap = new Map<string, Idea>();
     for (const item of updatedList) {
       uniqueMap.set(item.id, item);
@@ -166,7 +153,16 @@ export const App: React.FC = () => {
     }
   };
 
-  // Trigger manual sync
+  // Reset to seed demo data
+  const handleResetSeedData = () => {
+    setIdeas(INITIAL_IDEAS);
+    setCurrentIdeaIndex(0);
+    saveLocalIdeas(INITIAL_IDEAS);
+    for (const idea of INITIAL_IDEAS) {
+      syncIdeaToCloud(idea);
+    }
+  };
+
   const handleTriggerSync = () => {
     syncAllWithCloud(ideas).then(({ updatedIdeas, cloudAvailable }) => {
       setIsCloudConnected(cloudAvailable);
@@ -176,216 +172,103 @@ export const App: React.FC = () => {
     });
   };
 
-  // Filtered and sorted ideas
-  const filteredIdeas = useMemo(() => {
-    let result = [...ideas];
-
-    // Search filter
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      result = result.filter(
-        (i) =>
-          i.title.toLowerCase().includes(q) ||
-          i.oneLiner.toLowerCase().includes(q) ||
-          (i.problem && i.problem.toLowerCase().includes(q)) ||
-          (i.solution && i.solution.toLowerCase().includes(q)) ||
-          i.category.toLowerCase().includes(q) ||
-          i.tags.some((t) => t.toLowerCase().includes(q))
-      );
-    }
-
-    // Category filter
-    if (selectedCategory !== 'ALL') {
-      result = result.filter((i) => i.category === selectedCategory);
-    }
-
-    // Favorites only
-    if (filterFavoritesOnly) {
-      result = result.filter((i) => i.isFavorite);
-    }
-
-    // Sorting
-    result.sort((a, b) => {
-      // Pinned always come first in grid view
-      if (a.pinned && !b.pinned) return -1;
-      if (!a.pinned && b.pinned) return 1;
-
-      if (sortBy === 'score') {
-        return calculateScore(b) - calculateScore(a);
-      }
-      if (sortBy === 'excitement') {
-        return b.excitement - a.excitement;
-      }
-      if (sortBy === 'alphabetical') {
-        return a.title.localeCompare(b.title);
-      }
-      // default: updated
-      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-    });
-
-    return result;
-  }, [ideas, searchQuery, selectedCategory, sortBy, filterFavoritesOnly]);
-
-  const avgScore = useMemo(() => {
-    if (ideas.length === 0) return 0;
-    const sum = ideas.reduce((acc, curr) => acc + calculateScore(curr), 0);
-    return Math.round(sum / ideas.length);
-  }, [ideas]);
-
   return (
-    <div className="app-layout">
-      {/* Header and Filter Controls */}
-      <Header
-        viewMode={viewMode}
-        setViewMode={setViewMode}
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        selectedCategory={selectedCategory}
-        setSelectedCategory={setSelectedCategory}
-        onOpenQuickCapture={() => {
-          setEditingIdea(null);
-          setIsQuickCaptureOpen(true);
-        }}
-        onOpenInstallGuide={() => setIsInstallGuideOpen(true)}
-        onOpenSettings={() => setIsSettingsOpen(true)}
-        onExportMarkdown={() => exportIdeasToMarkdown(ideas)}
-        onExportJSON={() => exportIdeasToJSON(ideas)}
-        totalIdeas={ideas.length}
-        avgScore={avgScore}
-        isCloudConnected={isCloudConnected}
-      />
-
-      {/* Main Content Area */}
-      <main className="main-content-viewport">
-        {/* Controls Bar for Grid View (Sort, Favorites, Count) */}
-        {viewMode === 'grid' && (
-          <div className="vault-subbar">
-            <div className="subbar-left">
-              <span className="results-count">
-                Showing <strong>{filteredIdeas.length}</strong> of <strong>{ideas.length}</strong> ideas
-              </span>
-              <button
-                className={`filter-pill-btn ${filterFavoritesOnly ? 'active' : ''}`}
-                onClick={() => setFilterFavoritesOnly(!filterFavoritesOnly)}
-              >
-                <Star size={13} className={filterFavoritesOnly ? 'fill-star' : ''} />
-                <span>Favorites Only</span>
-              </button>
-            </div>
-
-            <div className="subbar-right">
-              <div className="sort-select-wrap">
-                <ArrowUpDown size={14} className="sort-icon" />
-                <span className="sort-label">Sort:</span>
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as any)}
-                  className="sort-dropdown"
-                >
-                  <option value="score">Highest Viability Score</option>
-                  <option value="excitement">Highest Excitement 🔥</option>
-                  <option value="updated">Recently Updated</option>
-                  <option value="alphabetical">Alphabetical (A-Z)</option>
-                </select>
-              </div>
-            </div>
+    <div className="retro-desk-canvas">
+      {/* Vintage Top Navigation Ribbon */}
+      <header className="retro-top-ribbon">
+        <div className="ribbon-brand-left" onClick={() => toggleMinimize(false)}>
+          <MascotCharacter size={32} showBadge={false} />
+          <div>
+            <h1 className="ribbon-title">IdeaNoter</h1>
+            <span className="ribbon-subtitle">Floating Quick Pad • Bright & Retro</span>
           </div>
-        )}
+        </div>
 
-        {/* View 1: Cards & Canvas Grid */}
-        {viewMode === 'grid' && (
-          <>
-            {filteredIdeas.length === 0 ? (
-              <div className="empty-vault-card">
-                <div className="empty-icon-wrap">💡</div>
-                <h3 className="empty-title">No ideas found</h3>
-                <p className="empty-desc">
-                  {searchQuery || selectedCategory !== 'ALL'
-                    ? 'No startup ideas match your current search or category filter.'
-                    : 'Your idea vault is currently empty. Whenever inspiration strikes, capture it instantly!'}
-                </p>
-                <button
-                  className="btn-primary"
-                  onClick={() => {
-                    setEditingIdea(null);
-                    setIsQuickCaptureOpen(true);
-                  }}
-                >
-                  <Plus size={16} />
-                  <span>Capture New Idea</span>
-                </button>
-              </div>
-            ) : (
-              <div className="ideas-cards-grid">
-                {filteredIdeas.map((idea) => (
-                  <IdeaCard
-                    key={idea.id}
-                    idea={idea}
-                    onUpdateIdea={handleUpdateIdea}
-                    onDeleteIdea={handleDeleteIdea}
-                    onEditIdea={handleEditIdea}
-                  />
-                ))}
-              </div>
-            )}
-          </>
-        )}
+        <div className="ribbon-actions-right">
+          {/* Quick Tear New Page Button */}
+          <button className="ribbon-btn ribbon-btn-primary" onClick={() => handleCreateNewIdea()}>
+            <Plus size={15} />
+            <span>New Note</span>
+            <kbd className="ribbon-kbd">⌘N</kbd>
+          </button>
 
-        {/* View 2: Kanban Pipeline Board */}
-        {viewMode === 'kanban' && (
-          <KanbanBoard
-            ideas={filteredIdeas}
+          {/* Sync status */}
+          <button
+            className={`ribbon-pill-btn ${isCloudConnected ? 'connected' : 'local'}`}
+            onClick={() => setIsSettingsOpen(true)}
+            title="Cloud Sync Status (Click to configure)"
+          >
+            <Cloud size={13} />
+            <span className="hide-mobile">{isCloudConnected ? 'Cloud Synced' : 'Local Vault'}</span>
+          </button>
+
+          {/* iPhone / Mobile App Guide */}
+          <button
+            className="ribbon-pill-btn"
+            onClick={() => setIsInstallGuideOpen(true)}
+            title="Get on iPhone / Mobile"
+          >
+            <Smartphone size={14} />
+            <span className="hide-mobile">Get on iPhone</span>
+          </button>
+
+          {/* Export Notes */}
+          <button
+            className="ribbon-icon-btn"
+            onClick={() => exportIdeasToMarkdown(ideas)}
+            title="Export Markdown Notes"
+          >
+            <Download size={15} />
+          </button>
+
+          {/* Settings */}
+          <button
+            className="ribbon-icon-btn"
+            onClick={() => setIsSettingsOpen(true)}
+            title="Settings & Backups"
+          >
+            <Settings size={15} />
+          </button>
+        </div>
+      </header>
+
+      {/* Main Workspace Area */}
+      <main className="retro-workspace-body">
+        {/* If Not Minimized: Show Draggable Floating Notepad */}
+        {!isMinimized && (
+          <FloatingNotepad
+            ideas={ideas}
+            currentIdeaIndex={currentIdeaIndex}
+            setCurrentIdeaIndex={setCurrentIdeaIndex}
             onUpdateIdea={handleUpdateIdea}
-            onOpenQuickCapture={handleOpenQuickCaptureWithStage}
-            onEditIdea={handleEditIdea}
+            onCreateNewIdea={handleCreateNewIdea}
+            onDeleteCurrentIdea={handleDeleteCurrentIdea}
+            onMinimize={() => toggleMinimize(true)}
+            onOpenSettings={() => setIsSettingsOpen(true)}
+            onOpenMobileGuide={() => setIsInstallGuideOpen(true)}
+            onExportMarkdown={() => exportIdeasToMarkdown(ideas)}
           />
         )}
 
-        {/* View 3: Priority Matrix 2x2 */}
-        {viewMode === 'matrix' && (
-          <PriorityMatrix ideas={filteredIdeas} onEditIdea={handleEditIdea} />
+        {/* If Minimized: Show Floating Cute Character Mascot Widget */}
+        {isMinimized && (
+          <FloatingMascotWidget
+            ideaCount={ideas.length}
+            onOpenNotepad={() => toggleMinimize(false)}
+            onQuickNewNote={() => handleCreateNewIdea()}
+            onOpenMobileGuide={() => setIsInstallGuideOpen(true)}
+            onOpenSettings={() => setIsSettingsOpen(true)}
+          />
         )}
       </main>
 
-      {/* Floating Action Button on Desktop */}
-      <button
-        className="desktop-floating-capture-btn"
-        onClick={() => {
-          setEditingIdea(null);
-          setIsQuickCaptureOpen(true);
-        }}
-        title="Quick Capture Idea (⌘N)"
-      >
-        <Plus size={24} />
-      </button>
-
-      {/* Mobile Native Bottom Navigation Bar */}
-      <MobileTabBar
-        viewMode={viewMode}
-        setViewMode={setViewMode}
-        onOpenQuickCapture={() => {
-          setEditingIdea(null);
-          setIsQuickCaptureOpen(true);
-        }}
-        onOpenInstallGuide={() => setIsInstallGuideOpen(true)}
-      />
-
-      {/* Modals */}
-      <QuickCaptureModal
-        isOpen={isQuickCaptureOpen}
-        onClose={() => {
-          setIsQuickCaptureOpen(false);
-          setEditingIdea(null);
-        }}
-        onSaveIdea={handleSaveIdea}
-        editingIdea={editingIdea}
-      />
-
+      {/* Mobile Install Guide Modal */}
       <MobileInstallGuideModal
         isOpen={isInstallGuideOpen}
         onClose={() => setIsInstallGuideOpen(false)}
       />
 
+      {/* Settings & Supabase Cloud Sync Modal */}
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
