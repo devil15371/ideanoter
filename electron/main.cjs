@@ -6,7 +6,7 @@ let mainWindow = null;
 let isPinned = true;
 
 const NOTEPAD_WIDTH = 380;
-const NOTEPAD_HEIGHT = 560;
+const NOTEPAD_HEIGHT = 580;
 const MASCOT_WIDTH = 96;
 const MASCOT_HEIGHT = 100;
 
@@ -14,23 +14,27 @@ function createWindow() {
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
 
-  // Position nicely on the right side of the screen
-  const x = Math.max(20, screenWidth - NOTEPAD_WIDTH - 40);
-  const y = Math.max(40, Math.round((screenHeight - NOTEPAD_HEIGHT) / 2));
+  // Center window on screen initially so the user immediately sees it
+  const x = Math.round((screenWidth - NOTEPAD_WIDTH) / 2);
+  const y = Math.round((screenHeight - NOTEPAD_HEIGHT) / 2);
+
+  console.log(`[IdeaNoter] Screen: ${screenWidth}x${screenHeight}, Window position: (${x}, ${y})`);
 
   mainWindow = new BrowserWindow({
     width: NOTEPAD_WIDTH,
     height: NOTEPAD_HEIGHT,
     minWidth: 320,
     minHeight: 420,
-    maxWidth: 700,
-    maxHeight: 1000,
+    maxWidth: 750,
+    maxHeight: 1100,
     x,
     y,
+    center: true,
     frame: false,
     transparent: true,
     hasShadow: true,
     resizable: true,
+    show: true,
     alwaysOnTop: isPinned,
     backgroundColor: '#00000000',
     webPreferences: {
@@ -42,19 +46,44 @@ function createWindow() {
 
   if (isPinned) {
     mainWindow.setAlwaysOnTop(true, 'floating');
+    try {
+      mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    } catch {}
   }
 
   // Load production dist or local dev server
   const distIndex = path.join(__dirname, '../dist/index.html');
-  if (fs.existsSync(distIndex) && process.env.VITE_DEV !== 'true') {
+  const distExists = fs.existsSync(distIndex);
+  console.log('[IdeaNoter] distIndex:', distIndex, 'exists:', distExists);
+
+  if (distExists && process.env.VITE_DEV !== 'true') {
     mainWindow.loadFile(distIndex);
   } else {
     mainWindow.loadURL('http://localhost:5173').catch(() => {
-      if (fs.existsSync(distIndex)) {
+      if (distExists) {
         mainWindow.loadFile(distIndex);
       }
     });
   }
+
+  mainWindow.webContents.on('did-finish-load', () => {
+    console.log('[IdeaNoter] WebContents finished load successfully!');
+    mainWindow.show();
+    mainWindow.focus();
+    app.focus({ steal: true });
+  });
+
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
+    console.error('[IdeaNoter] Failed to load page:', errorCode, errorDescription);
+  });
+
+  mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+    console.log(`[Renderer Console] ${message} (${sourceId}:${line})`);
+  });
+
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    console.error('[IdeaNoter] Render process gone:', details);
+  });
 
   // Global toggle shortcut: ⌘+Shift+I
   try {

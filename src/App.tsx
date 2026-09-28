@@ -35,13 +35,7 @@ declare global {
 export const App: React.FC = () => {
   const [ideas, setIdeas] = useState<Idea[]>(() => loadLocalIdeas());
   const [currentIdeaIndex, setCurrentIdeaIndex] = useState<number>(0);
-  const [isMinimized, setIsMinimized] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('ideanoter_minimized_v1') === 'true';
-    } catch {
-      return false;
-    }
-  });
+  const [isMinimized, setIsMinimized] = useState<boolean>(false);
 
   // Modals state
   const [isInstallGuideOpen, setIsInstallGuideOpen] = useState(false);

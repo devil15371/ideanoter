@@ -28,8 +28,8 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>
-      // Register service worker for offline & PWA capability
-      if ('serviceWorker' in navigator) {
+      // Register service worker for offline & PWA capability (only on HTTP/HTTPS)
+      if ('serviceWorker' in navigator && (location.protocol === 'http:' || location.protocol === 'https:')) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js').catch((err) => {
             console.log('SW registration error:', err);

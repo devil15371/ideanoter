@@ -49,8 +49,8 @@
 
 /* Invisibility / Ghost Mode when idle */
 .notepad-floating-window.is-idle-invisible {
-  opacity: 0.04;
-  filter: blur(2px);
+  opacity: 0.25;
+  filter: blur(0.5px);
 }
 
 .notepad-floating-window.is-idle-invisible:hover {

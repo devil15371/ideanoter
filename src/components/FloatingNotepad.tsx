@@ -59,12 +59,12 @@ export const FloatingNotepad: React.FC<FloatingNotepadProps> = ({
   const [isRecording, setIsRecording] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
 
-  // Invisibility / Ghost mode when idle
+  // Invisibility / Ghost mode when idle (disabled by default so notepad stays 100% visible)
   const [ghostModeEnabled, setGhostModeEnabled] = useState<boolean>(() => {
     try {
-      return localStorage.getItem('ideanoter_ghost_mode_v1') !== 'false';
+      return localStorage.getItem('ideanoter_ghost_mode_v1') === 'true';
     } catch {
-      return true;
+      return false;
     }
   });
   const [isIdle, setIsIdle] = useState(false);
