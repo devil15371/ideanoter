@@ -13,6 +13,7 @@ import {
   Settings,
   Download,
   Smartphone,
+  Ghost,
 } from 'lucide-react';
 import type { Idea, IdeaCategory } from '../types/idea';
 import { CATEGORIES } from '../types/idea';
@@ -55,6 +56,34 @@ export const FloatingNotepad: React.FC<FloatingNotepadProps> = ({
   const [isListDrawerOpen, setIsListDrawerOpen] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+
+  // Invisibility / Ghost mode when idle
+  const [ghostModeEnabled, setGhostModeEnabled] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('ideanoter_ghost_mode_v1') !== 'false';
+    } catch {
+      return true;
+    }
+  });
+  const [isIdle, setIsIdle] = useState(false);
+  const idleTimerRef = useRef<any>(null);
+
+  const resetIdleTimer = () => {
+    setIsIdle(false);
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    if (ghostModeEnabled) {
+      idleTimerRef.current = setTimeout(() => {
+        setIsIdle(true);
+      }, 3500);
+    }
+  };
+
+  useEffect(() => {
+    resetIdleTimer();
+    return () => {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    };
+  }, [ghostModeEnabled]);
 
   // Dragging state for the floating window
   const [position, setPosition] = useState<{ x: number; y: number }>(() => {
@@ -291,10 +320,16 @@ export const FloatingNotepad: React.FC<FloatingNotepadProps> = ({
 
   return (
     <div
-      className="notepad-floating-window"
+      className={`notepad-floating-window ${ghostModeEnabled && isIdle ? 'is-idle-invisible' : ''}`}
       style={{
         transform: `translate3d(${position.x}px, ${position.y}px, 0)`,
       }}
+      onMouseEnter={() => {
+        setIsIdle(false);
+        if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      }}
+      onMouseLeave={resetIdleTimer}
+      onMouseMove={resetIdleTimer}
     >
       {/* Vintage Top Spiral / Header Bar (Draggable) */}
       <div
@@ -333,6 +368,18 @@ export const FloatingNotepad: React.FC<FloatingNotepadProps> = ({
 
         {/* Right Header Tools */}
         <div className="notepad-header-tools">
+          <button
+            className={`header-icon-tool ghost-toggle ${ghostModeEnabled ? 'active' : ''}`}
+            onClick={() => {
+              const next = !ghostModeEnabled;
+              setGhostModeEnabled(next);
+              localStorage.setItem('ideanoter_ghost_mode_v1', String(next));
+              if (!next) setIsIdle(false);
+            }}
+            title={ghostModeEnabled ? 'Ghost Mode ON (becomes invisible when idle)' : 'Ghost Mode OFF (always visible)'}
+          >
+            <Ghost size={13} />
+          </button>
           <button
             className="header-icon-tool"
             onClick={onOpenMobileGuide}

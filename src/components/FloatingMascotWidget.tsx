@@ -38,6 +38,25 @@ export const FloatingMascotWidget: React.FC<FloatingMascotWidgetProps> = ({
     startY: 0,
   });
 
+  // Ghost invisibility when idle
+  const [isIdle, setIsIdle] = useState(false);
+  const idleTimerRef = useRef<any>(null);
+
+  const resetIdleTimer = () => {
+    setIsIdle(false);
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    idleTimerRef.current = setTimeout(() => {
+      setIsIdle(true);
+    }, 4000);
+  };
+
+  useEffect(() => {
+    resetIdleTimer();
+    return () => {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    };
+  }, []);
+
   const handleMouseDown = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('.mascot-action-bubble')) {
       return;
@@ -126,10 +145,16 @@ export const FloatingMascotWidget: React.FC<FloatingMascotWidgetProps> = ({
 
   return (
     <div
-      className={`floating-mascot-wrapper ${isDragging ? 'dragging' : ''}`}
+      className={`floating-mascot-wrapper ${isDragging ? 'dragging' : ''} ${isIdle ? 'is-idle-invisible' : ''}`}
       style={{
         transform: `translate3d(${position.x}px, ${position.y}px, 0)`,
       }}
+      onMouseEnter={() => {
+        setIsIdle(false);
+        if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      }}
+      onMouseLeave={resetIdleTimer}
+      onMouseMove={resetIdleTimer}
       onMouseDown={handleMouseDown}
       onTouchStart={handleTouchStart}
     >
