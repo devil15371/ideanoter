@@ -48,21 +48,21 @@ export const MascotCharacter: React.FC<MascotCharacterProps> = ({
         <defs>
           {/* Warm Vintage Body Gradient */}
           <radialGradient id="mascotBody" cx="40%" cy="35%" r="65%">
-            <stop offset="0%" stop-color="#fff8db" />
-            <stop offset="55%" stop-color="#fed7aa" />
-            <stop offset="100%" stop-color="#f97316" />
+            <stop offset="0%" stopColor="#fff8db" />
+            <stop offset="55%" stopColor="#fed7aa" />
+            <stop offset="100%" stopColor="#f97316" />
           </radialGradient>
 
           {/* Golden Aura Glow */}
           <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
-            <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#f97316" flood-opacity="0.35" />
+            <feDropShadow dx="0" dy="4" stdDeviation="5" floodColor="#f97316" floodOpacity="0.35" />
           </filter>
 
           {/* Vintage Brass Pen Cap */}
           <linearGradient id="brassGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#fef08a" />
-            <stop offset="50%" stop-color="#ca8a04" />
-            <stop offset="100%" stop-color="#854d0e" />
+            <stop offset="0%" stopColor="#fef08a" />
+            <stop offset="50%" stopColor="#ca8a04" />
+            <stop offset="100%" stopColor="#854d0e" />
           </linearGradient>
         </defs>
 
