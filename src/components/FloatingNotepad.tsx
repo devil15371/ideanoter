@@ -321,9 +321,6 @@ export const FloatingNotepad: React.FC<FloatingNotepadProps> = ({
   return (
     <div
       className={`notepad-floating-window ${ghostModeEnabled && isIdle ? 'is-idle-invisible' : ''}`}
-      style={{
-        transform: `translate3d(${position.x}px, ${position.y}px, 0)`,
-      }}
       onMouseEnter={() => {
         setIsIdle(false);
         if (idleTimerRef.current) clearTimeout(idleTimerRef.current);

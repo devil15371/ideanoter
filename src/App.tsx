@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { FloatingNotepad } from './components/FloatingNotepad';
-import { FloatingMascotWidget } from './components/FloatingMascotWidget';
+import { MascotCharacter } from './components/MascotCharacter';
 import { MobileInstallGuideModal } from './components/MobileInstallGuideModal';
 import { SettingsModal } from './components/SettingsModal';
-import { MascotCharacter } from './components/MascotCharacter';
 
 import type { Idea } from './types/idea';
 import { INITIAL_IDEAS } from './data/seedIdeas';
@@ -19,13 +18,19 @@ import {
   syncIdeaToCloud,
   deleteIdeaFromCloud,
 } from './services/supabase';
-import {
-  Smartphone,
-  Settings,
-  Plus,
-  Cloud,
-  Download,
-} from 'lucide-react';
+
+// Helper for Electron window resizing
+declare global {
+  interface Window {
+    electronAPI?: {
+      resizeToMascot: () => void;
+      resizeToNotepad: () => void;
+      setAlwaysOnTop: (flag: boolean) => void;
+      setWindowOpacity: (opacity: number) => void;
+      closeWindow: () => void;
+    };
+  }
+}
 
 export const App: React.FC = () => {
   const [ideas, setIdeas] = useState<Idea[]>(() => loadLocalIdeas());
@@ -41,7 +46,34 @@ export const App: React.FC = () => {
   // Modals state
   const [isInstallGuideOpen, setIsInstallGuideOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isCloudConnected, setIsCloudConnected] = useState(false);
+  const [_isCloudConnected, setIsCloudConnected] = useState(false);
+
+  // Auto-invisibility when idle for minimized mascot
+  const [isIdle, setIsIdle] = useState(false);
+
+  // Sync window size with initial minimized state
+  useEffect(() => {
+    if (isMinimized) {
+      window.electronAPI?.resizeToMascot();
+    } else {
+      window.electronAPI?.resizeToNotepad();
+    }
+  }, []);
+
+  // Idle timer for mascot
+  useEffect(() => {
+    let timer: any = null;
+    if (isMinimized) {
+      timer = setTimeout(() => {
+        setIsIdle(true);
+      }, 4000);
+    } else {
+      setIsIdle(false);
+    }
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [isMinimized]);
 
   // Initial cloud sync
   useEffect(() => {
@@ -60,18 +92,16 @@ export const App: React.FC = () => {
   // Keyboard shortcut listener (⌘N for new sheet, Esc to toggle minimize)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // ⌘N or Ctrl+N -> New Page
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'n') {
         e.preventDefault();
         handleCreateNewIdea();
       }
-      // Esc -> Toggle minimize or close modal
       if (e.key === 'Escape') {
         if (isInstallGuideOpen || isSettingsOpen) {
           setIsInstallGuideOpen(false);
           setIsSettingsOpen(false);
         } else {
-          toggleMinimize();
+          toggleMinimize(true);
         }
       }
     };
@@ -80,14 +110,18 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isInstallGuideOpen, isSettingsOpen, isMinimized, ideas]);
 
-  const toggleMinimize = (minimizedState?: boolean) => {
-    setIsMinimized((prev) => {
-      const next = typeof minimizedState === 'boolean' ? minimizedState : !prev;
-      try {
-        localStorage.setItem('ideanoter_minimized_v1', String(next));
-      } catch {}
-      return next;
-    });
+  const toggleMinimize = (minimizedState: boolean) => {
+    setIsMinimized(minimizedState);
+    try {
+      localStorage.setItem('ideanoter_minimized_v1', String(minimizedState));
+    } catch {}
+
+    if (minimizedState) {
+      window.electronAPI?.resizeToMascot();
+    } else {
+      setIsIdle(false);
+      window.electronAPI?.resizeToNotepad();
+    }
   };
 
   // Create new idea note
@@ -117,7 +151,7 @@ export const App: React.FC = () => {
     saveLocalIdeas(updatedList);
     syncIdeaToCloud(newIdea);
 
-    // Make sure notepad is open
+    // Expand notepad
     toggleMinimize(false);
   };
 
@@ -153,7 +187,6 @@ export const App: React.FC = () => {
     }
   };
 
-  // Reset to seed demo data
   const handleResetSeedData = () => {
     setIdeas(INITIAL_IDEAS);
     setCurrentIdeaIndex(0);
@@ -173,94 +206,35 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="retro-desk-canvas">
-      {/* Vintage Top Navigation Ribbon */}
-      <header className="retro-top-ribbon">
-        <div className="ribbon-brand-left" onClick={() => toggleMinimize(false)}>
-          <MascotCharacter size={32} showBadge={false} />
-          <div>
-            <h1 className="ribbon-title">IdeaNoter</h1>
-            <span className="ribbon-subtitle">Floating Quick Pad • Bright & Retro</span>
-          </div>
+    <div className="single-app-root">
+      {/* State 1: When Minimized, ONLY the cute character mascot sits in the corner */}
+      {isMinimized ? (
+        <div
+          className={`standalone-mascot-pill ${isIdle ? 'mascot-ghost-idle' : ''}`}
+          onClick={() => {
+            playAudioFeedback('spark');
+            toggleMinimize(false);
+          }}
+          onMouseEnter={() => setIsIdle(false)}
+          title="Click to write an idea!"
+        >
+          <MascotCharacter size={68} ideaCount={ideas.length} showBadge={true} />
         </div>
-
-        <div className="ribbon-actions-right">
-          {/* Quick Tear New Page Button */}
-          <button className="ribbon-btn ribbon-btn-primary" onClick={() => handleCreateNewIdea()}>
-            <Plus size={15} />
-            <span>New Note</span>
-            <kbd className="ribbon-kbd">⌘N</kbd>
-          </button>
-
-          {/* Sync status */}
-          <button
-            className={`ribbon-pill-btn ${isCloudConnected ? 'connected' : 'local'}`}
-            onClick={() => setIsSettingsOpen(true)}
-            title="Cloud Sync Status (Click to configure)"
-          >
-            <Cloud size={13} />
-            <span className="hide-mobile">{isCloudConnected ? 'Cloud Synced' : 'Local Vault'}</span>
-          </button>
-
-          {/* iPhone / Mobile App Guide */}
-          <button
-            className="ribbon-pill-btn"
-            onClick={() => setIsInstallGuideOpen(true)}
-            title="Get on iPhone / Mobile"
-          >
-            <Smartphone size={14} />
-            <span className="hide-mobile">Get on iPhone</span>
-          </button>
-
-          {/* Export Notes */}
-          <button
-            className="ribbon-icon-btn"
-            onClick={() => exportIdeasToMarkdown(ideas)}
-            title="Export Markdown Notes"
-          >
-            <Download size={15} />
-          </button>
-
-          {/* Settings */}
-          <button
-            className="ribbon-icon-btn"
-            onClick={() => setIsSettingsOpen(true)}
-            title="Settings & Backups"
-          >
-            <Settings size={15} />
-          </button>
-        </div>
-      </header>
-
-      {/* Main Workspace Area */}
-      <main className="retro-workspace-body">
-        {/* If Not Minimized: Show Draggable Floating Notepad */}
-        {!isMinimized && (
-          <FloatingNotepad
-            ideas={ideas}
-            currentIdeaIndex={currentIdeaIndex}
-            setCurrentIdeaIndex={setCurrentIdeaIndex}
-            onUpdateIdea={handleUpdateIdea}
-            onCreateNewIdea={handleCreateNewIdea}
-            onDeleteCurrentIdea={handleDeleteCurrentIdea}
-            onMinimize={() => toggleMinimize(true)}
-            onOpenSettings={() => setIsSettingsOpen(true)}
-            onOpenMobileGuide={() => setIsInstallGuideOpen(true)}
-            onExportMarkdown={() => exportIdeasToMarkdown(ideas)}
-          />
-        )}
-
-        {/* If Minimized: Show Floating Cute Character Mascot Widget */}
-        {isMinimized && (
-          <FloatingMascotWidget
-            ideaCount={ideas.length}
-            onOpenNotepad={() => toggleMinimize(false)}
-            onQuickNewNote={() => handleCreateNewIdea()}
-            onOpenMobileGuide={() => setIsInstallGuideOpen(true)}
-            onOpenSettings={() => setIsSettingsOpen(true)}
-          />
-        )}
-      </main>
+      ) : (
+        /* State 2: When Open, ONLY the notepad is displayed (fills the window directly) */
+        <FloatingNotepad
+          ideas={ideas}
+          currentIdeaIndex={currentIdeaIndex}
+          setCurrentIdeaIndex={setCurrentIdeaIndex}
+          onUpdateIdea={handleUpdateIdea}
+          onCreateNewIdea={handleCreateNewIdea}
+          onDeleteCurrentIdea={handleDeleteCurrentIdea}
+          onMinimize={() => toggleMinimize(true)}
+          onOpenSettings={() => setIsSettingsOpen(true)}
+          onOpenMobileGuide={() => setIsInstallGuideOpen(true)}
+          onExportMarkdown={() => exportIdeasToMarkdown(ideas)}
+        />
+      )}
 
       {/* Mobile Install Guide Modal */}
       <MobileInstallGuideModal
@@ -268,7 +242,7 @@ export const App: React.FC = () => {
         onClose={() => setIsInstallGuideOpen(false)}
       />
 
-      {/* Settings & Supabase Cloud Sync Modal */}
+      {/* Settings Modal */}
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}

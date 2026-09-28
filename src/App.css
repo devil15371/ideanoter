@@ -1,182 +1,83 @@
 /* ==========================================================================
-   IdeaNoter — Floating Notepad & Character Mascot Component Styles
+   IdeaNoter — Single Floating Window & Corner Character Mascot
    ========================================================================== */
 
-/* Top Vintage Ribbon */
-.retro-top-ribbon {
+/* Standalone Mascot Pill (When Minimized in Corner) */
+.standalone-mascot-pill {
+  width: 90px;
+  height: 95px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: calc(10px + var(--safe-top)) 24px 10px 24px;
-  background: rgba(255, 253, 245, 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(120, 53, 15, 0.12);
-  box-shadow: 0 2px 8px rgba(69, 26, 3, 0.04);
-  z-index: 20;
-}
-
-.ribbon-brand-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  justify-content: center;
+  background: transparent;
   cursor: pointer;
-  transition: transform 0.15s ease;
+  user-select: none;
+  -webkit-app-region: drag;
+  transition: opacity 0.4s ease, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.ribbon-brand-left:hover {
-  transform: scale(1.02);
+.standalone-mascot-pill:hover {
+  transform: scale(1.1);
 }
 
-.ribbon-title {
-  font-family: var(--font-typewriter);
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--vintage-leather);
-  letter-spacing: -0.01em;
-  line-height: 1.1;
+.standalone-mascot-pill.mascot-ghost-idle {
+  opacity: 0.16;
+  filter: blur(0.5px);
 }
 
-.ribbon-subtitle {
-  font-size: 0.76rem;
-  color: var(--ink-muted);
-  font-weight: 500;
-}
-
-.ribbon-actions-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.ribbon-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  border-radius: 8px;
-  font-size: 0.82rem;
-  font-weight: 600;
-  transition: all 0.15s ease;
-}
-
-.ribbon-btn-primary {
-  background: linear-gradient(135deg, #78350f 0%, #92400e 100%);
-  color: #fffdf5;
-  box-shadow: 0 2px 6px rgba(120, 53, 15, 0.3);
-}
-
-.ribbon-btn-primary:hover {
-  background: #5b280b;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 10px rgba(120, 53, 15, 0.4);
-}
-
-.ribbon-kbd {
-  font-family: var(--font-typewriter);
-  font-size: 0.7rem;
-  background: rgba(255, 255, 255, 0.2);
-  padding: 1px 5px;
-  border-radius: 4px;
-  margin-left: 2px;
-}
-
-.ribbon-pill-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 6px 12px;
-  border-radius: 20px;
-  font-size: 0.8rem;
-  font-weight: 500;
-  background: rgba(120, 53, 15, 0.06);
-  border: 1px solid rgba(120, 53, 15, 0.14);
-  color: var(--vintage-leather);
-  transition: all 0.15s ease;
-}
-
-.ribbon-pill-btn:hover {
-  background: rgba(120, 53, 15, 0.12);
-}
-
-.ribbon-pill-btn.connected {
-  background: rgba(4, 120, 87, 0.1);
-  border-color: rgba(4, 120, 87, 0.25);
-  color: #047857;
-}
-
-.ribbon-icon-btn {
-  padding: 7px;
-  border-radius: 8px;
-  color: var(--ink-secondary);
-  background: rgba(120, 53, 15, 0.05);
-  border: 1px solid rgba(120, 53, 15, 0.1);
-  transition: all 0.15s ease;
-}
-
-.ribbon-icon-btn:hover {
-  background: rgba(120, 53, 15, 0.12);
-  color: var(--ink-primary);
-}
-
-/* Main Workspace Canvas */
-.retro-workspace-body {
-  flex: 1;
-  position: relative;
-  overflow: hidden;
-  min-height: calc(100vh - 65px);
+.standalone-mascot-pill.mascot-ghost-idle:hover {
+  opacity: 1;
+  filter: none;
 }
 
 /* ==========================================================================
-   Floating Notepad Window
+   Floating Notepad Window (Fills Native Window Directly)
    ========================================================================== */
 .notepad-floating-window {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 410px;
-  max-width: calc(100vw - 24px);
+  width: 100%;
+  height: 100%;
   background: var(--paper-ivory);
   border-radius: 12px;
   border: 1px solid var(--paper-border);
-  box-shadow: var(--paper-shadow);
-  z-index: 50;
+  box-shadow: 0 10px 30px rgba(69, 26, 3, 0.18);
   display: flex;
   flex-direction: column;
-  transition: box-shadow 0.2s ease, opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1), filter 0.45s ease;
+  overflow: hidden;
   user-select: text;
+  transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1), filter 0.45s ease;
 }
 
 /* Invisibility / Ghost Mode when idle */
 .notepad-floating-window.is-idle-invisible {
   opacity: 0.04;
   filter: blur(2px);
-  box-shadow: none;
 }
 
 .notepad-floating-window.is-idle-invisible:hover {
   opacity: 1;
   filter: none;
-  box-shadow: var(--paper-shadow);
 }
 
-/* Vintage Leather Header Bar (Draggable) */
+/* Vintage Leather Header Bar (Native macOS Dragging) */
 .notepad-vintage-header {
   background: linear-gradient(180deg, #60290b 0%, #451a03 100%);
   color: #fef08a;
-  padding: 10px 14px;
-  border-top-left-radius: 11px;
-  border-top-right-radius: 11px;
+  padding: 8px 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  cursor: grab;
+  -webkit-app-region: drag;
   user-select: none;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 2px 5px rgba(0, 0, 0, 0.2);
+  flex-shrink: 0;
 }
 
-.notepad-vintage-header:active {
-  cursor: grabbing;
+/* Controls inside header must be clickable (-webkit-app-region: no-drag) */
+.notepad-vintage-header button,
+.notepad-vintage-header .mini-mascot-head,
+.notepad-vintage-header select,
+.notepad-vintage-header input {
+  -webkit-app-region: no-drag;
 }
 
 /* Retro Window Buttons */
@@ -362,14 +263,15 @@
     var(--ruled-line) 29px,
     var(--ruled-line) 30px
   );
-  padding: 14px 16px 12px 18px;
+  padding: 12px 14px 10px 16px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   position: relative;
-  /* Left Red Margin line (classic legal notepad style) */
-  border-left: 2px solid var(--margin-line);
-  margin-left: 10px;
+  flex: 1;
+  overflow-y: auto;
+  border-left: 3px solid var(--margin-line);
+  margin-left: 0;
 }
 
 /* Font styling switches */
