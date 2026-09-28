@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
+  X,
   Minus,
   Plus,
+  Pin,
   Trash2,
   Copy,
   Check,
@@ -169,6 +171,26 @@ export const FloatingNotepad: React.FC<FloatingNotepadProps> = ({
     setTimeout(() => setIsTyping(false), 400);
   };
 
+  // Pinned state (Always on top)
+  const [isPinned, setIsPinned] = useState(true);
+
+  useEffect(() => {
+    if ((window as any).electronAPI?.onPinChanged) {
+      (window as any).electronAPI.onPinChanged((status: boolean) => {
+        setIsPinned(status);
+      });
+    }
+  }, []);
+
+  const handleTogglePin = () => {
+    playAudioFeedback('click');
+    if ((window as any).electronAPI?.togglePin) {
+      (window as any).electronAPI.togglePin();
+    } else {
+      setIsPinned((prev) => !prev);
+    }
+  };
+
   // Dragging handlers
   const handleMouseDown = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('button, input, select, textarea, .notepad-content-sheet')) {
@@ -176,8 +198,8 @@ export const FloatingNotepad: React.FC<FloatingNotepadProps> = ({
     }
     setIsDragging(true);
     dragStartRef.current = {
-      mouseX: e.clientX,
-      mouseY: e.clientY,
+      mouseX: e.screenX,
+      mouseY: e.screenY,
       startX: position.x,
       startY: position.y,
     };
@@ -200,11 +222,21 @@ export const FloatingNotepad: React.FC<FloatingNotepadProps> = ({
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isDragging) return;
-      const dx = e.clientX - dragStartRef.current.mouseX;
-      const dy = e.clientY - dragStartRef.current.mouseY;
-      const newX = Math.max(10, Math.min(window.innerWidth - 360, dragStartRef.current.startX + dx));
-      const newY = Math.max(10, Math.min(window.innerHeight - 300, dragStartRef.current.startY + dy));
-      setPosition({ x: newX, y: newY });
+      const dx = e.screenX - dragStartRef.current.mouseX;
+      const dy = e.screenY - dragStartRef.current.mouseY;
+      dragStartRef.current.mouseX = e.screenX;
+      dragStartRef.current.mouseY = e.screenY;
+
+      // In Electron Mac app, move the actual native window
+      if ((window as any).electronAPI?.moveWindowBy) {
+        (window as any).electronAPI.moveWindowBy(dx, dy);
+      } else {
+        // Fallback for browser preview
+        setPosition((prev) => ({
+          x: Math.max(10, Math.min(window.innerWidth - 360, prev.x + dx)),
+          y: Math.max(10, Math.min(window.innerHeight - 300, prev.y + dy)),
+        }));
+      }
     };
 
     const handleTouchMove = (e: TouchEvent) => {
@@ -212,8 +244,10 @@ export const FloatingNotepad: React.FC<FloatingNotepadProps> = ({
       const touch = e.touches[0];
       const dx = touch.clientX - dragStartRef.current.mouseX;
       const dy = touch.clientY - dragStartRef.current.mouseY;
-      const newX = Math.max(5, Math.min(window.innerWidth - 340, dragStartRef.current.startX + dx));
-      const newY = Math.max(5, Math.min(window.innerHeight - 250, dragStartRef.current.startY + dy));
+      dragStartRef.current.mouseX = touch.clientX;
+      dragStartRef.current.mouseY = touch.clientY;
+      const newX = Math.max(5, Math.min(window.innerWidth - 340, position.x + dx));
+      const newY = Math.max(5, Math.min(window.innerHeight - 250, position.y + dy));
       setPosition({ x: newX, y: newY });
     };
 
@@ -337,29 +371,58 @@ export const FloatingNotepad: React.FC<FloatingNotepadProps> = ({
         {/* Left: Vintage retro window buttons */}
         <div className="retro-window-controls">
           <button
-            className="retro-btn btn-minimize"
-            onClick={onMinimize}
-            title="Minimize to cute character icon"
+            className="retro-btn btn-close"
+            onClick={() => {
+              if ((window as any).electronAPI?.closeWindow) {
+                (window as any).electronAPI.closeWindow();
+              } else {
+                onMinimize();
+              }
+            }}
+            title="Close IdeaNoter"
           >
-            <Minus size={11} strokeWidth={3} />
+            <X size={10} strokeWidth={3} />
+          </button>
+          <button
+            className="retro-btn btn-minimize"
+            onClick={() => {
+              if ((window as any).electronAPI?.minimizeWindow) {
+                (window as any).electronAPI.minimizeWindow();
+              } else {
+                onMinimize();
+              }
+            }}
+            title="Minimize"
+          >
+            <Minus size={10} strokeWidth={3} />
+          </button>
+          <button
+            className={`retro-btn btn-pin ${isPinned ? 'pinned' : ''}`}
+            onClick={handleTogglePin}
+            title={isPinned ? 'Window Pinned (Always on top). Click to unpin' : 'Click to Pin always on top'}
+          >
+            <Pin size={10} strokeWidth={2.5} />
           </button>
           <button
             className="retro-btn btn-new"
             onClick={handleCreateNewSheet}
-            title="Tear new page (Cmd+N)"
+            title="Tear new page (⌘+N)"
           >
-            <Plus size={11} strokeWidth={3} />
+            <Plus size={10} strokeWidth={3} />
           </button>
         </div>
 
-        {/* Center: Old style title & Mascot icon */}
-        <div className="notepad-header-brand">
+        {/* Center: Old style brand title, mascot icon & tactile drag grip */}
+        <div className="notepad-header-brand" title="Click and drag here to move IdeaNoter anywhere on screen">
           <div className="mini-mascot-head" onClick={onMinimize} title="Click to minimize!">
-            <MascotCharacter size={26} isTyping={isTyping} showBadge={false} />
+            <MascotCharacter size={24} isTyping={isTyping} showBadge={false} />
           </div>
           <span className="notepad-brand-title">IdeaNoter</span>
+          <div className="header-drag-handle" title="Drag window">
+            <span className="drag-dots">⋮⋮</span>
+          </div>
           <span className="notepad-page-indicator">
-            {ideas.length > 0 ? `${currentIdeaIndex + 1} / ${ideas.length}` : '0 / 0'}
+            {ideas.length > 0 ? `${currentIdeaIndex + 1}/${ideas.length}` : '0/0'}
           </span>
         </div>
 

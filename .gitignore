@@ -26,7 +26,11 @@ dist-ssr
 # Android build outputs
 .gradle
 android/.gradle
-android/build
 android/app/build
 android/capacitor-cordova-android-plugins/build
 
+# Desktop and Mobile app packages
+release-builds/
+*.apk
+*.dmg
+*.zip

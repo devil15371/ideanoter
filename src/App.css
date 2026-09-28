@@ -88,29 +88,72 @@
 }
 
 .retro-btn {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(0, 0, 0, 0.3);
-  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
-  transition: transform 0.1s ease;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.4), 0 1px 2px rgba(0, 0, 0, 0.35);
+  transition: transform 0.12s ease, background-color 0.15s ease;
+  cursor: pointer;
 }
 
 .retro-btn:hover {
-  transform: scale(1.15);
+  transform: scale(1.18);
+}
+
+.btn-close {
+  background: #ef4444;
+  color: #ffffff;
+  border-color: #991b1b;
+}
+
+.btn-close:hover {
+  background: #dc2626;
 }
 
 .btn-minimize {
   background: #f59e0b;
   color: #78350f;
+  border-color: #b45309;
+}
+
+.btn-pin {
+  background: #78350f;
+  color: #fde68a;
+  border-color: #92400e;
+}
+
+.btn-pin.pinned {
+  background: #facc15;
+  color: #713f12;
+  border-color: #ca8a04;
+  box-shadow: 0 0 6px rgba(250, 204, 21, 0.8), inset 0 1px 2px rgba(255, 255, 255, 0.6);
 }
 
 .btn-new {
   background: #22c55e;
   color: #14532d;
+  border-color: #15803d;
+}
+
+/* Drag Handle Grip */
+.header-drag-handle {
+  display: flex;
+  align-items: center;
+  color: rgba(254, 240, 138, 0.4);
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  cursor: grab;
+  user-select: none;
+  padding: 0 2px;
+  transition: color 0.15s ease;
+}
+
+.notepad-vintage-header:hover .header-drag-handle {
+  color: rgba(254, 240, 138, 0.85);
 }
 
 /* Center Mascot & Header Title */

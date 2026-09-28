@@ -1,116 +1,125 @@
 const { app, BrowserWindow, globalShortcut, ipcMain, screen } = require('electron');
 const path = require('path');
+const fs = require('fs');
 
 let mainWindow = null;
+let isPinned = true;
+
+const NOTEPAD_WIDTH = 380;
+const NOTEPAD_HEIGHT = 560;
+const MASCOT_WIDTH = 96;
+const MASCOT_HEIGHT = 100;
 
 function createWindow() {
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
 
-  // Initial notepad size
-  const winWidth = 380;
-  const winHeight = 520;
-  // Position near bottom-right corner
-  const x = Math.max(20, screenWidth - winWidth - 30);
-  const y = Math.max(40, screenHeight - winHeight - 30);
+  // Position nicely on the right side of the screen
+  const x = Math.max(20, screenWidth - NOTEPAD_WIDTH - 40);
+  const y = Math.max(40, Math.round((screenHeight - NOTEPAD_HEIGHT) / 2));
 
   mainWindow = new BrowserWindow({
-    width: winWidth,
-    height: winHeight,
+    width: NOTEPAD_WIDTH,
+    height: NOTEPAD_HEIGHT,
+    minWidth: 320,
+    minHeight: 420,
+    maxWidth: 700,
+    maxHeight: 1000,
     x,
     y,
     frame: false,
     transparent: true,
-    alwaysOnTop: true,
-    hasShadow: false,
+    hasShadow: true,
     resizable: true,
+    alwaysOnTop: isPinned,
     backgroundColor: '#00000000',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
       contextIsolation: true,
     },
-    type: 'panel',
-    skipTaskbar: false,
   });
 
-  // Keep floating on top of all macOS apps/spaces
-  mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  mainWindow.setAlwaysOnTop(true, 'floating');
+  if (isPinned) {
+    mainWindow.setAlwaysOnTop(true, 'floating');
+  }
 
-  const devUrl = 'http://localhost:5174';
-  mainWindow.loadURL(devUrl).catch(() => {
-    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
-  });
+  // Load production dist or local dev server
+  const distIndex = path.join(__dirname, '../dist/index.html');
+  if (fs.existsSync(distIndex) && process.env.VITE_DEV !== 'true') {
+    mainWindow.loadFile(distIndex);
+  } else {
+    mainWindow.loadURL('http://localhost:5173').catch(() => {
+      if (fs.existsSync(distIndex)) {
+        mainWindow.loadFile(distIndex);
+      }
+    });
+  }
 
-  // Global shortcut to show/hide notepad from anywhere
-  globalShortcut.register('CommandOrControl+Shift+I', () => {
-    if (mainWindow.isVisible()) {
-      mainWindow.hide();
-    } else {
-      mainWindow.show();
-      mainWindow.focus();
-    }
-  });
+  // Global toggle shortcut: ⌘+Shift+I
+  try {
+    globalShortcut.register('CommandOrControl+Shift+I', () => {
+      if (!mainWindow) return;
+      if (mainWindow.isVisible()) {
+        mainWindow.hide();
+      } else {
+        mainWindow.show();
+        mainWindow.focus();
+      }
+    });
+  } catch (err) {
+    console.error('Shortcut register error:', err);
+  }
 
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
 }
 
-// IPC handler: Shrink to Mascot icon at the corner
-ipcMain.on('resize-to-mascot', () => {
-  if (!mainWindow) return;
-  const bounds = mainWindow.getBounds();
-  const mascotWidth = 92;
-  const mascotHeight = 100;
-  // Keep anchored to current bottom-right or current position
-  mainWindow.setBounds({
-    x: bounds.x + (bounds.width - mascotWidth),
-    y: bounds.y + (bounds.height - mascotHeight),
-    width: mascotWidth,
-    height: mascotHeight,
-  }, true);
-});
-
-// IPC handler: Expand to full notepad
-ipcMain.on('resize-to-notepad', () => {
-  if (!mainWindow) return;
-  const bounds = mainWindow.getBounds();
-  const notepadWidth = 380;
-  const notepadHeight = 520;
-  const primaryDisplay = screen.getPrimaryDisplay();
-  const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
-
-  let newX = bounds.x - (notepadWidth - bounds.width);
-  let newY = bounds.y - (notepadHeight - bounds.height);
-
-  // Keep within visible screen
-  newX = Math.max(20, Math.min(newX, screenWidth - notepadWidth - 20));
-  newY = Math.max(30, Math.min(newY, screenHeight - notepadHeight - 20));
-
-  mainWindow.setBounds({
-    x: newX,
-    y: newY,
-    width: notepadWidth,
-    height: notepadHeight,
-  }, true);
-});
-
-ipcMain.on('set-always-on-top', (event, flag) => {
-  if (mainWindow) {
-    mainWindow.setAlwaysOnTop(flag, 'floating');
-  }
-});
-
-ipcMain.on('set-window-opacity', (event, opacity) => {
-  if (mainWindow) {
-    mainWindow.setOpacity(opacity);
-  }
+// Window control IPC
+ipcMain.on('minimize-window', () => {
+  if (mainWindow) mainWindow.minimize();
 });
 
 ipcMain.on('close-window', () => {
-  if (mainWindow) mainWindow.hide();
+  if (mainWindow) mainWindow.close();
+});
+
+ipcMain.on('quit-app', () => {
+  app.quit();
+});
+
+ipcMain.on('toggle-pin', () => {
+  if (!mainWindow) return;
+  isPinned = !isPinned;
+  mainWindow.setAlwaysOnTop(isPinned, isPinned ? 'floating' : 'normal');
+  mainWindow.webContents.send('pin-status', isPinned);
+});
+
+ipcMain.on('set-always-on-top', (_event, flag) => {
+  if (!mainWindow) return;
+  isPinned = flag;
+  mainWindow.setAlwaysOnTop(isPinned, isPinned ? 'floating' : 'normal');
+  mainWindow.webContents.send('pin-status', isPinned);
+});
+
+ipcMain.on('move-window-by', (_event, { dx, dy }) => {
+  if (!mainWindow) return;
+  const [curX, curY] = mainWindow.getPosition();
+  mainWindow.setPosition(curX + dx, curY + dy);
+});
+
+ipcMain.on('resize-to-mascot', () => {
+  if (!mainWindow) return;
+  mainWindow.setResizable(true);
+  mainWindow.setMinimumSize(80, 80);
+  mainWindow.setSize(MASCOT_WIDTH, MASCOT_HEIGHT, true);
+});
+
+ipcMain.on('resize-to-notepad', () => {
+  if (!mainWindow) return;
+  mainWindow.setMinimumSize(320, 420);
+  mainWindow.setSize(NOTEPAD_WIDTH, NOTEPAD_HEIGHT, true);
 });
 
 app.whenReady().then(() => {
@@ -121,6 +130,7 @@ app.whenReady().then(() => {
       createWindow();
     } else if (mainWindow) {
       mainWindow.show();
+      mainWindow.focus();
     }
   });
 });
