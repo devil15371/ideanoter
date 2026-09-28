@@ -1,5 +1,4 @@
 import type { Idea } from '../types/idea';
-import { INITIAL_IDEAS } from '../data/seedIdeas';
 import {
   getSupabaseClient,
   fetchIdeasFromCloud,
@@ -7,22 +6,52 @@ import {
 } from './supabase';
 
 const STORAGE_KEY_IDEAS = 'ideanoter_ideas_vault_v1';
+const STORAGE_KEY_ACTIVE_INDEX = 'ideanoter_active_index_v1';
+const STORAGE_KEY_DRAFT = 'ideanoter_active_draft_v1';
+
+export function createBlankIdea(title = 'Quick Note', content = ''): Idea {
+  const now = new Date().toISOString();
+  return {
+    id: 'idea-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+    title,
+    oneLiner: content,
+    category: 'AI',
+    stage: 'spark',
+    excitement: 4,
+    marketSize: 4,
+    feasibility: 4,
+    tags: ['Quick Note'],
+    checklist: [],
+    pinned: false,
+    isFavorite: false,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
 
 export function loadLocalIdeas(): Idea[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_IDEAS);
-    if (raw) {
+    if (raw !== null) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+      if (Array.isArray(parsed)) {
+        if (parsed.length > 0) {
+          return parsed;
+        } else {
+          // If vault was empty, return 1 clean blank note so user can type immediately
+          const blank = [createBlankIdea('Quick Note', '')];
+          saveLocalIdeas(blank);
+          return blank;
+        }
       }
     }
   } catch (e) {
     console.error('Failed to load local ideas', e);
   }
-  // Fallback to initial ideas on first visit
-  saveLocalIdeas(INITIAL_IDEAS);
-  return INITIAL_IDEAS;
+  // First time launch: start with 1 fresh blank note ready for writing
+  const initial = [createBlankIdea('Quick Note', '')];
+  saveLocalIdeas(initial);
+  return initial;
 }
 
 export function saveLocalIdeas(ideas: Idea[]): void {
@@ -31,6 +60,39 @@ export function saveLocalIdeas(ideas: Idea[]): void {
   } catch (e) {
     console.error('Failed to save ideas to local storage', e);
   }
+}
+
+export function loadActiveIdeaIndex(maxIndex: number): number {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_ACTIVE_INDEX);
+    if (raw !== null) {
+      const idx = parseInt(raw, 10);
+      if (!isNaN(idx) && idx >= 0 && idx <= maxIndex) {
+        return idx;
+      }
+    }
+  } catch {}
+  return 0;
+}
+
+export function saveActiveIdeaIndex(index: number): void {
+  try {
+    localStorage.setItem(STORAGE_KEY_ACTIVE_INDEX, String(index));
+  } catch {}
+}
+
+export function saveActiveDraft(draft: { title: string; content: string; category?: string }): void {
+  try {
+    localStorage.setItem(STORAGE_KEY_DRAFT, JSON.stringify(draft));
+  } catch {}
+}
+
+export function loadActiveDraft(): { title: string; content: string; category?: string } | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_DRAFT);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return null;
 }
 
 export async function syncAllWithCloud(localIdeas: Idea[]): Promise<{ updatedIdeas: Idea[]; cloudAvailable: boolean }> {

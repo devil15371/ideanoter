@@ -20,14 +20,14 @@ import {
 import type { Idea, IdeaCategory } from '../types/idea';
 import { CATEGORIES } from '../types/idea';
 import { MascotCharacter } from './MascotCharacter';
-import { playAudioFeedback } from '../services/storage';
+import { playAudioFeedback, saveActiveDraft } from '../services/storage';
 
 interface FloatingNotepadProps {
   ideas: Idea[];
   currentIdeaIndex: number;
   setCurrentIdeaIndex: (index: number) => void;
   onUpdateIdea: (idea: Idea) => void;
-  onCreateNewIdea: (title?: string) => void;
+  onCreateNewIdea: (title?: string, initialContent?: string) => void;
   onDeleteCurrentIdea: (id: string) => void;
   onMinimize: () => void;
   onOpenSettings: () => void;
@@ -49,9 +49,15 @@ export const FloatingNotepad: React.FC<FloatingNotepadProps> = ({
 }) => {
   const currentIdea = ideas[currentIdeaIndex] || ideas[0] || null;
 
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
-  const [category, setCategory] = useState<IdeaCategory>('AI');
+  const [title, setTitle] = useState(() => currentIdea?.title || '');
+  const [content, setContent] = useState(() => {
+    if (!currentIdea) return '';
+    if (currentIdea.problem || currentIdea.solution) {
+      return `${currentIdea.oneLiner}\n\nProblem:\n${currentIdea.problem || ''}\n\nSolution:\n${currentIdea.solution || ''}`.trim();
+    }
+    return currentIdea.oneLiner || '';
+  });
+  const [category, setCategory] = useState<IdeaCategory>(() => currentIdea?.category || 'AI');
   const [stamp, setStamp] = useState<'SPARK' | 'STARTUP' | 'BUILD' | 'TOP SECRET'>('SPARK');
   const [fontStyle, setFontStyle] = useState<'typewriter' | 'handwriting' | 'serif'>('typewriter');
   const [isCopied, setIsCopied] = useState(false);
@@ -112,13 +118,22 @@ export const FloatingNotepad: React.FC<FloatingNotepadProps> = ({
   // Sync state with current idea
   useEffect(() => {
     if (currentIdea) {
-      setTitle(currentIdea.title);
-      // Combine oneLiner and problem/solution into friendly note text if present
-      const combined = currentIdea.problem
-        ? `${currentIdea.oneLiner}\n\nProblem:\n${currentIdea.problem}\n\nSolution:\n${currentIdea.solution || ''}`
-        : currentIdea.oneLiner;
-      setContent(combined);
-      setCategory(currentIdea.category);
+      setTitle(currentIdea.title || '');
+      if (currentIdea.problem || currentIdea.solution) {
+        const combined = `${currentIdea.oneLiner}\n\nProblem:\n${currentIdea.problem || ''}\n\nSolution:\n${currentIdea.solution || ''}`.trim();
+        setContent(combined);
+        setCategory(currentIdea.category);
+        onUpdateIdea({
+          ...currentIdea,
+          oneLiner: combined,
+          problem: undefined,
+          solution: undefined,
+          updatedAt: new Date().toISOString(),
+        });
+      } else {
+        setContent(currentIdea.oneLiner || '');
+        setCategory(currentIdea.category);
+      }
     } else {
       setTitle('');
       setContent('');
@@ -134,24 +149,32 @@ export const FloatingNotepad: React.FC<FloatingNotepadProps> = ({
   const handleTitleChange = (val: string) => {
     setTitle(val);
     triggerTypingAnimation();
+    saveActiveDraft({ title: val, content, category });
     if (currentIdea) {
       onUpdateIdea({
         ...currentIdea,
-        title: val || 'Untitled Spark',
+        title: val,
         updatedAt: new Date().toISOString(),
       });
+    } else {
+      onCreateNewIdea(val, content);
     }
   };
 
   const handleContentChange = (val: string) => {
     setContent(val);
     triggerTypingAnimation();
+    saveActiveDraft({ title, content: val, category });
     if (currentIdea) {
       onUpdateIdea({
         ...currentIdea,
         oneLiner: val,
+        problem: undefined,
+        solution: undefined,
         updatedAt: new Date().toISOString(),
       });
+    } else {
+      onCreateNewIdea(title || 'Quick Note', val);
     }
   };
 

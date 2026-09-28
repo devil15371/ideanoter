@@ -5,13 +5,15 @@ import { MobileInstallGuideModal } from './components/MobileInstallGuideModal';
 import { SettingsModal } from './components/SettingsModal';
 
 import type { Idea } from './types/idea';
-import { INITIAL_IDEAS } from './data/seedIdeas';
 import {
   loadLocalIdeas,
   saveLocalIdeas,
   syncAllWithCloud,
   exportIdeasToMarkdown,
   playAudioFeedback,
+  createBlankIdea,
+  loadActiveIdeaIndex,
+  saveActiveIdeaIndex,
 } from './services/storage';
 import {
   getSavedSupabaseConfig,
@@ -36,9 +38,26 @@ declare global {
 }
 
 export const App: React.FC = () => {
-  const [ideas, setIdeas] = useState<Idea[]>(() => loadLocalIdeas());
-  const [currentIdeaIndex, setCurrentIdeaIndex] = useState<number>(0);
-  const [isMinimized, setIsMinimized] = useState<boolean>(false);
+  const [ideas, setIdeas] = useState<Idea[]>(() => {
+    const loaded = loadLocalIdeas();
+    if (loaded.length === 0) {
+      const blank = [createBlankIdea('Quick Note', '')];
+      saveLocalIdeas(blank);
+      return blank;
+    }
+    return loaded;
+  });
+  const [currentIdeaIndex, setCurrentIdeaIndex] = useState<number>(() => {
+    const loaded = loadLocalIdeas();
+    return loadActiveIdeaIndex(Math.max(0, loaded.length - 1));
+  });
+  const [isMinimized, setIsMinimized] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('ideanoter_minimized_v1') === 'true';
+    } catch {
+      return false;
+    }
+  });
 
   // Modals state
   const [isInstallGuideOpen, setIsInstallGuideOpen] = useState(false);
@@ -182,30 +201,20 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleSelectIdeaIndex = (idx: number) => {
+    setCurrentIdeaIndex(idx);
+    saveActiveIdeaIndex(idx);
+  };
+
   // Create new idea note
-  const handleCreateNewIdea = (title = 'New Spark') => {
+  const handleCreateNewIdea = (title = 'Quick Note', initialContent = '') => {
     playAudioFeedback('spark');
-    const now = new Date().toISOString();
-    const newIdea: Idea = {
-      id: 'idea-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
-      title: title,
-      oneLiner: '',
-      category: 'AI',
-      stage: 'spark',
-      excitement: 4,
-      marketSize: 4,
-      feasibility: 4,
-      tags: ['Quick Note'],
-      checklist: [],
-      pinned: false,
-      isFavorite: false,
-      createdAt: now,
-      updatedAt: now,
-    };
+    const newIdea = createBlankIdea(title, initialContent);
 
     const updatedList = [newIdea, ...ideas];
     setIdeas(updatedList);
     setCurrentIdeaIndex(0);
+    saveActiveIdeaIndex(0);
     saveLocalIdeas(updatedList);
     syncIdeaToCloud(newIdea);
 
@@ -215,17 +224,31 @@ export const App: React.FC = () => {
 
   // Update existing idea note
   const handleUpdateIdea = (updated: Idea) => {
-    const updatedList = ideas.map((i) => (i.id === updated.id ? updated : i));
-    setIdeas(updatedList);
-    saveLocalIdeas(updatedList);
+    let exists = false;
+    const updatedList = ideas.map((i) => {
+      if (i.id === updated.id) {
+        exists = true;
+        return updated;
+      }
+      return i;
+    });
+
+    const finalList = exists ? updatedList : [updated, ...ideas];
+    setIdeas(finalList);
+    saveLocalIdeas(finalList);
     syncIdeaToCloud(updated);
   };
 
   // Delete current idea
   const handleDeleteCurrentIdea = (id: string) => {
-    const updatedList = ideas.filter((i) => i.id !== id);
+    let updatedList = ideas.filter((i) => i.id !== id);
+    if (updatedList.length === 0) {
+      updatedList = [createBlankIdea('Quick Note', '')];
+    }
     setIdeas(updatedList);
-    setCurrentIdeaIndex((prev) => Math.max(0, Math.min(prev, updatedList.length - 1)));
+    const nextIdx = Math.max(0, Math.min(currentIdeaIndex, updatedList.length - 1));
+    setCurrentIdeaIndex(nextIdx);
+    saveActiveIdeaIndex(nextIdx);
     saveLocalIdeas(updatedList);
     deleteIdeaFromCloud(id);
   };
@@ -246,12 +269,11 @@ export const App: React.FC = () => {
   };
 
   const handleResetSeedData = () => {
-    setIdeas(INITIAL_IDEAS);
+    const blank = [createBlankIdea('Quick Note', '')];
+    setIdeas(blank);
     setCurrentIdeaIndex(0);
-    saveLocalIdeas(INITIAL_IDEAS);
-    for (const idea of INITIAL_IDEAS) {
-      syncIdeaToCloud(idea);
-    }
+    saveActiveIdeaIndex(0);
+    saveLocalIdeas(blank);
   };
 
   const handleTriggerSync = () => {
@@ -284,7 +306,7 @@ export const App: React.FC = () => {
         <FloatingNotepad
           ideas={ideas}
           currentIdeaIndex={currentIdeaIndex}
-          setCurrentIdeaIndex={setCurrentIdeaIndex}
+          setCurrentIdeaIndex={handleSelectIdeaIndex}
           onUpdateIdea={handleUpdateIdea}
           onCreateNewIdea={handleCreateNewIdea}
           onDeleteCurrentIdea={handleDeleteCurrentIdea}
