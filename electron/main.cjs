@@ -14,11 +14,9 @@ function createWindow() {
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
 
-  // Center window on screen initially so the user immediately sees it
+  // Center window on screen initially
   const x = Math.round((screenWidth - NOTEPAD_WIDTH) / 2);
   const y = Math.round((screenHeight - NOTEPAD_HEIGHT) / 2);
-
-  console.log(`[IdeaNoter] Screen: ${screenWidth}x${screenHeight}, Window position: (${x}, ${y})`);
 
   mainWindow = new BrowserWindow({
     width: NOTEPAD_WIDTH,
@@ -54,7 +52,6 @@ function createWindow() {
   // Load production dist or local dev server
   const distIndex = path.join(__dirname, '../dist/index.html');
   const distExists = fs.existsSync(distIndex);
-  console.log('[IdeaNoter] distIndex:', distIndex, 'exists:', distExists);
 
   if (distExists && process.env.VITE_DEV !== 'true') {
     mainWindow.loadFile(distIndex);
@@ -67,7 +64,6 @@ function createWindow() {
   }
 
   mainWindow.webContents.on('did-finish-load', () => {
-    console.log('[IdeaNoter] WebContents finished load successfully!');
     mainWindow.show();
     mainWindow.focus();
     app.focus({ steal: true });
@@ -77,14 +73,6 @@ function createWindow() {
     console.error('[IdeaNoter] Failed to load page:', errorCode, errorDescription);
   });
 
-  mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
-    console.log(`[Renderer Console] ${message} (${sourceId}:${line})`);
-  });
-
-  mainWindow.webContents.on('render-process-gone', (_event, details) => {
-    console.error('[IdeaNoter] Render process gone:', details);
-  });
-
   // Global toggle shortcut: ⌘+Shift+I
   try {
     globalShortcut.register('CommandOrControl+Shift+I', () => {
@@ -92,8 +80,12 @@ function createWindow() {
       if (mainWindow.isVisible()) {
         mainWindow.hide();
       } else {
+        if (mainWindow.isMinimized()) {
+          mainWindow.restore();
+        }
         mainWindow.show();
         mainWindow.focus();
+        mainWindow.webContents.send('expand-notepad');
       }
     });
   } catch (err) {
@@ -147,8 +139,19 @@ ipcMain.on('resize-to-mascot', () => {
 
 ipcMain.on('resize-to-notepad', () => {
   if (!mainWindow) return;
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+  const [curX, curY] = mainWindow.getPosition();
+
+  // Keep expanded window fully visible within display boundaries
+  const newX = Math.max(10, Math.min(curX, screenWidth - NOTEPAD_WIDTH - 15));
+  const newY = Math.max(30, Math.min(curY, screenHeight - NOTEPAD_HEIGHT - 15));
+
   mainWindow.setMinimumSize(320, 420);
+  mainWindow.setPosition(newX, newY, true);
   mainWindow.setSize(NOTEPAD_WIDTH, NOTEPAD_HEIGHT, true);
+  mainWindow.show();
+  mainWindow.focus();
 });
 
 app.whenReady().then(() => {
@@ -158,8 +161,12 @@ app.whenReady().then(() => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
     } else if (mainWindow) {
+      if (mainWindow.isMinimized()) {
+        mainWindow.restore();
+      }
       mainWindow.show();
       mainWindow.focus();
+      mainWindow.webContents.send('expand-notepad');
     }
   });
 });

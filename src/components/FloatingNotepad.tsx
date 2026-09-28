@@ -385,14 +385,8 @@ export const FloatingNotepad: React.FC<FloatingNotepadProps> = ({
           </button>
           <button
             className="retro-btn btn-minimize"
-            onClick={() => {
-              if ((window as any).electronAPI?.minimizeWindow) {
-                (window as any).electronAPI.minimizeWindow();
-              } else {
-                onMinimize();
-              }
-            }}
-            title="Minimize"
+            onClick={onMinimize}
+            title="Collapse to Character Mascot"
           >
             <Minus size={10} strokeWidth={3} />
           </button>

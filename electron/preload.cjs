@@ -13,4 +13,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onPinChanged: (callback) => {
     ipcRenderer.on('pin-status', (_event, value) => callback(value));
   },
+  onExpandNotepad: (callback) => {
+    ipcRenderer.on('expand-notepad', () => callback());
+  },
 });

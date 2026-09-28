@@ -28,6 +28,9 @@ declare global {
       setAlwaysOnTop: (flag: boolean) => void;
       setWindowOpacity: (opacity: number) => void;
       closeWindow: () => void;
+      moveWindowBy?: (dx: number, dy: number) => void;
+      onExpandNotepad?: (callback: () => void) => void;
+      togglePin?: () => void;
     };
   }
 }
@@ -44,6 +47,67 @@ export const App: React.FC = () => {
 
   // Auto-invisibility when idle for minimized mascot
   const [isIdle, setIsIdle] = useState(false);
+
+  // Mascot drag & click detection
+  const mascotDragRef = React.useRef({
+    isDragging: false,
+    startScreenX: 0,
+    startScreenY: 0,
+    moved: false,
+  });
+
+  const handleMascotMouseDown = (e: React.MouseEvent) => {
+    mascotDragRef.current = {
+      isDragging: true,
+      startScreenX: e.screenX,
+      startScreenY: e.screenY,
+      moved: false,
+    };
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!mascotDragRef.current.isDragging) return;
+      const dx = e.screenX - mascotDragRef.current.startScreenX;
+      const dy = e.screenY - mascotDragRef.current.startScreenY;
+      if (Math.hypot(dx, dy) > 3) {
+        mascotDragRef.current.moved = true;
+      }
+      mascotDragRef.current.startScreenX = e.screenX;
+      mascotDragRef.current.startScreenY = e.screenY;
+
+      if (window.electronAPI?.moveWindowBy) {
+        window.electronAPI.moveWindowBy(dx, dy);
+      }
+    };
+
+    const handleMouseUp = () => {
+      if (mascotDragRef.current.isDragging) {
+        const wasClick = !mascotDragRef.current.moved;
+        mascotDragRef.current.isDragging = false;
+        if (wasClick) {
+          playAudioFeedback('spark');
+          toggleMinimize(false);
+        }
+      }
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
+
+  // Listen for Electron expand signal (Dock click or Cmd+Shift+I)
+  useEffect(() => {
+    if (window.electronAPI?.onExpandNotepad) {
+      window.electronAPI.onExpandNotepad(() => {
+        toggleMinimize(false);
+      });
+    }
+  }, []);
 
   // Sync window size with initial minimized state
   useEffect(() => {
@@ -205,12 +269,13 @@ export const App: React.FC = () => {
       {isMinimized ? (
         <div
           className={`standalone-mascot-pill ${isIdle ? 'mascot-ghost-idle' : ''}`}
+          onMouseDown={handleMascotMouseDown}
           onClick={() => {
             playAudioFeedback('spark');
             toggleMinimize(false);
           }}
           onMouseEnter={() => setIsIdle(false)}
-          title="Click to write an idea!"
+          title="Click to write an idea! (Or drag to move)"
         >
           <MascotCharacter size={68} ideaCount={ideas.length} showBadge={true} />
         </div>
